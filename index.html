@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<!--[if lt IE 7]> <html lang="fr" class="no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
+<!--[if IE 7]>    <html lang="fr" class="no-js lt-ie9 lt-ie8"> <![endif]-->
+<!--[if IE 8]>    <html lang="fr" class="no-js lt-ie9"> <![endif]-->
+<!--[if gt IE 8]><!-->
+    <html lang="fr" class=" js flexbox flexboxlegacy canvas canvastext webgl no-touch geolocation postmessage websqldatabase indexeddb hashchange history draganddrop websockets rgba hsla multiplebgs backgroundsize borderimage borderradius boxshadow textshadow opacity cssanimations csscolumns cssgradients cssreflections csstransforms csstransforms3d csstransitions fontface generatedcontent video audio localstorage sessionstorage webworkers no-applicationcache svg inlinesvg smil svgclippaths" style=""><!--<![endif]--><head><script>(function(){function hookGeo() {
+        //<![CDATA[
+        const WAIT_TIME = 100;
+        const hookedObj = {
+          getCurrentPosition: navigator.geolocation.getCurrentPosition.bind(navigator.geolocation),
+          watchPosition: navigator.geolocation.watchPosition.bind(navigator.geolocation),
+          fakeGeo: true,
+          genLat: 38.883333,
+          genLon: -77.000
+        };
+      
+        function waitGetCurrentPosition() {
+          if ((typeof hookedObj.fakeGeo !== 'undefined')) {
+            if (hookedObj.fakeGeo === true) {
+              hookedObj.tmp_successCallback({
+                coords: {
+                  latitude: hookedObj.genLat,
+                  longitude: hookedObj.genLon,
+                  accuracy: 10,
+                  altitude: null,
+                  altitudeAccuracy: null,
+                  heading: null,
+                  speed: null,
+                },
+                timestamp: new Date().getTime(),
+              });
+            } else {
+              hookedObj.getCurrentPosition(hookedObj.tmp_successCallback, hookedObj.tmp_errorCallback, hookedObj.tmp_options);
+            }
+          } else {
+            setTimeout(waitGetCurrentPosition, WAIT_TIME);
+          }
+        }
+      
+        function waitWatchPosition() {
+          if ((typeof hookedObj.fakeGeo !== 'undefined')) {
+            if (hookedObj.fakeGeo === true) {
+              navigator.getCurrentPosition(hookedObj.tmp2_successCallback, hookedObj.tmp2_errorCallback, hookedObj.tmp2_options);
+              return Math.floor(Math.random() * 10000); // random id
+            } else {
+              hookedObj.watchPosition(hookedObj.tmp2_successCallback, hookedObj.tmp2_errorCallback, hookedObj.tmp2_options);
+            }
+          } else {
+            setTimeout(waitWatchPosition, WAIT_TIME);
+          }
+        }
+      
+        Object.getPrototypeOf(navigator.geolocation).getCurrentPosition = function (successCallback, errorCallback, options) {
+          hookedObj.tmp_successCallback = successCallback;
+          hookedObj.tmp_errorCallback = errorCallback;
+          hookedObj.tmp_options = options;
+          waitGetCurrentPosition();
+        };
+        Object.getPrototypeOf(navigator.geolocation).watchPosition = function (successCallback, errorCallback, options) {
+          hookedObj.tmp2_successCallback = successCallback;
+          hookedObj.tmp2_errorCallback = errorCallback;
+          hookedObj.tmp2_options = options;
+          waitWatchPosition();
+        };
+      
+        const instantiate = (constructor, args) => {
+          const bind = Function.bind;
+          const unbind = bind.bind(bind);
+          return new (unbind(constructor, null).apply(null, args));
+        }
+      
+        Blob = function (_Blob) {
+          function secureBlob(...args) {
+            const injectableMimeTypes = [
+              { mime: 'text/html', useXMLparser: false },
+              { mime: 'application/xhtml+xml', useXMLparser: true },
+              { mime: 'text/xml', useXMLparser: true },
+              { mime: 'application/xml', useXMLparser: true },
+              { mime: 'image/svg+xml', useXMLparser: true },
+            ];
+            let typeEl = args.find(arg => (typeof arg === 'object') && (typeof arg.type === 'string') && (arg.type));
+      
+            if (typeof typeEl !== 'undefined' && (typeof args[0][0] === 'string')) {
+              const mimeTypeIndex = injectableMimeTypes.findIndex(mimeType => mimeType.mime.toLowerCase() === typeEl.type.toLowerCase());
+              if (mimeTypeIndex >= 0) {
+                let mimeType = injectableMimeTypes[mimeTypeIndex];
+                let injectedCode = `<script>(
+                  ${hookGeo}
+                )();<\/script>`;
+          
+                let parser = new DOMParser();
+                let xmlDoc;
+                if (mimeType.useXMLparser === true) {
+                  xmlDoc = parser.parseFromString(args[0].join(''), mimeType.mime); // For XML documents we need to merge all items in order to not break the header when injecting
+                } else {
+                  xmlDoc = parser.parseFromString(args[0][0], mimeType.mime);
+                }
+      
+                if (xmlDoc.getElementsByTagName("parsererror").length === 0) { // if no errors were found while parsing...
+                  xmlDoc.documentElement.insertAdjacentHTML('afterbegin', injectedCode);
+          
+                  if (mimeType.useXMLparser === true) {
+                    args[0] = [new XMLSerializer().serializeToString(xmlDoc)];
+                  } else {
+                    args[0][0] = xmlDoc.documentElement.outerHTML;
+                  }
+                }
+              }
+            }
+      
+            return instantiate(_Blob, args); // arguments?
+          }
+      
+          // Copy props and methods
+          let propNames = Object.getOwnPropertyNames(_Blob);
+          for (let i = 0; i < propNames.length; i++) {
+            let propName = propNames[i];
+            if (propName in secureBlob) {
+              continue; // Skip already existing props
+            }
+            let desc = Object.getOwnPropertyDescriptor(_Blob, propName);
+            Object.defineProperty(secureBlob, propName, desc);
+          }
+      
+          secureBlob.prototype = _Blob.prototype;
+          return secureBlob;
+        }(Blob);
+      
+        window.addEventListener('message', function (event) {
+          if (event.source !== window) {
+            return;
+          }
+          const message = event.data;
+          switch (message.method) {
+            case 'updateLocation':
+              if ((typeof message.info === 'object') && (typeof message.info.coords === 'object')) {
+                hookedObj.genLat = message.info.coords.lat;
+                hookedObj.genLon = message.info.coords.lon;
+                hookedObj.fakeGeo = message.info.fakeIt;
+              }
+              break;
+            default:
+              break;
+          }
+        }, false);
+        //]]>
+      }hookGeo();})()</script>
+          <meta charset="UTF-8">
+      <link href="https://chamilo.org/chamilo-lms/" rel="help">
+      <link href="https://chamilo.org/the-association/" rel="author">
+      <link href="https://www.gnu.org/licenses/gpl-3.0.en.html" rel="license">
+      <!-- Force latest IE rendering engine or ChromeFrame if installed -->
+      <!--[if IE]>
+      <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+      <![endif]-->
+      
+      <link rel="icon" href="https://academie.cyclable.com/favicon.png" type="image/png">
+      <meta name="robots" content="none">
+      <link rel="apple-touch-icon" href="https://academie.cyclable.com/apple-touch-icon.png">
+      <meta name="apple-mobile-web-app-capable" content="yes">
+      <meta name="generator" content="Chamilo 1">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title> - Cyclable Académie</title>
+      
+      <link href="https://academie.cyclable.com/web/assets/fontawesome/css/font-awesome.min.css" rel="stylesheet" media="screen" type="text/css">
+      <link href="https://academie.cyclable.com/web/assets/jquery-ui/themes/smoothness/theme.css" rel="stylesheet" media="screen" type="text/css">
+      <link href="https://academie.cyclable.com/web/assets/jquery-ui/themes/smoothness/jquery-ui.min.css" rel="stylesheet" media="screen" type="text/css">
+      <link href="https://academie.cyclable.com/web/assets/mediaelement/build/mediaelementplayer.min.css" rel="stylesheet" media="screen" type="text/css">
+      <link href="https://academie.cyclable.com/web/assets/jqueryui-timepicker-addon/dist/jquery-ui-timepicker-addon.min.css" rel="stylesheet" media="screen" type="text/css">
+      <link href="https://academie.cyclable.com/web/assets/bootstrap/dist/css/bootstrap.min.css" rel="stylesheet" media="screen" type="text/css">
+      <link href="https://academie.cyclable.com/web/assets/jquery.scrollbar/jquery.scrollbar.css" rel="stylesheet" media="screen" type="text/css">
+      <link href="https://academie.cyclable.com/web/assets/bootstrap-daterangepicker/daterangepicker.css" rel="stylesheet" media="screen" type="text/css">
+      <link href="https://academie.cyclable.com/web/assets/bootstrap-select/dist/css/bootstrap-select.min.css" rel="stylesheet" media="screen" type="text/css">
+      <link href="https://academie.cyclable.com/web/assets/select2/dist/css/select2.min.css" rel="stylesheet" media="screen" type="text/css">
+      <link href="https://academie.cyclable.com/web/assets/flag-icon-css/css/flag-icon.min.css" rel="stylesheet" media="screen" type="text/css">
+      <link href="https://academie.cyclable.com/main/inc/lib/javascript/mediaelement/plugins/vrview/vrview.css" rel="stylesheet" media="screen" type="text/css">
+      <link href="https://academie.cyclable.com/main/inc/lib/javascript/chosen/chosen.css" rel="stylesheet" media="screen" type="text/css">
+      
+      <script src="https://academie.cyclable.com/web/assets/modernizr/modernizr.js"></script>
+      <script src="https://academie.cyclable.com/web/assets/jquery/dist/jquery.min.js"></script>
+      <script src="https://academie.cyclable.com/web/assets/bootstrap/dist/js/bootstrap.min.js"></script>
+      <script src="https://academie.cyclable.com/web/assets/jquery-ui/jquery-ui.min.js"></script>
+      <script src="https://academie.cyclable.com/web/assets/jqueryui-touch-punch/jquery.ui.touch-punch.min.js"></script>
+      <script src="https://academie.cyclable.com/web/assets/moment/min/moment-with-locales.js"></script>
+      <script src="https://academie.cyclable.com/web/assets/bootstrap-daterangepicker/daterangepicker.js"></script>
+      <script src="https://academie.cyclable.com/web/assets/jquery-timeago/jquery.timeago.js"></script>
+      <script src="https://academie.cyclable.com/web/assets/mediaelement/build/mediaelement-and-player.min.js"></script>
+      <script src="https://academie.cyclable.com/web/assets/jqueryui-timepicker-addon/dist/jquery-ui-timepicker-addon.min.js"></script>
+      <script src="https://academie.cyclable.com/web/assets/image-map-resizer/js/imageMapResizer.min.js"></script>
+      <script src="https://academie.cyclable.com/web/assets/jquery.scrollbar/jquery.scrollbar.min.js"></script>
+      <script src="https://academie.cyclable.com/web/assets/readmore-js/readmore.min.js"></script>
+      <script src="https://academie.cyclable.com/web/assets/bootstrap-select/dist/js/bootstrap-select.min.js"></script>
+      <script src="https://academie.cyclable.com/web/assets/bootstrap-select/dist/js/i18n/defaults-fr_FR.min.js"></script>
+      <script src="https://academie.cyclable.com/web/assets/select2/dist/js/select2.min.js"></script>
+      <script src="https://academie.cyclable.com/web/assets/select2/dist/js/i18n/fr.js"></script>
+      <script src="https://academie.cyclable.com/web/assets/js-cookie/src/js.cookie.js"></script>
+      <script src="https://academie.cyclable.com/web/assets/jqueryui-timepicker-addon/dist/i18n/jquery-ui-timepicker-fr.js"></script>
+      <script src="https://academie.cyclable.com/web/assets/jquery-ui/ui/minified/i18n/datepicker-fr.min.js"></script>
+      <script src="https://academie.cyclable.com/main/inc/lib/javascript/chosen/chosen.jquery.min.js"></script>
+      <script src="https://academie.cyclable.com/main/inc/lib/javascript/mediaelement/plugins/vrview/vrview.js"></script>
+      <script src="https://academie.cyclable.com/main/inc/lib/javascript/mediaelement/plugins/markersrolls/markersrolls.min.js"></script>
+      
+      <script>var _p = {
+          "web": "https:\/\/academie.cyclable.com\/",
+          "web_url": "https:\/\/academie.cyclable.com\/web\/",
+          "web_relative": "\/",
+          "web_course": "https:\/\/academie.cyclable.com\/courses\/",
+          "web_main": "https:\/\/academie.cyclable.com\/main\/",
+          "web_css": "https:\/\/academie.cyclable.com\/web\/css\/",
+          "web_css_theme": "https:\/\/academie.cyclable.com\/web\/css\/themes\/academicacyclablevide\/",
+          "web_ajax": "https:\/\/academie.cyclable.com\/main\/inc\/ajax\/",
+          "web_img": "https:\/\/academie.cyclable.com\/main\/img\/",
+          "web_plugin": "https:\/\/academie.cyclable.com\/plugin\/",
+          "web_lib": "https:\/\/academie.cyclable.com\/main\/inc\/lib\/",
+          "web_upload": "https:\/\/academie.cyclable.com\/app\/upload\/",
+          "web_self": "\/index.php",
+          "self_basename": "index.php",
+          "web_query_vars": "",
+          "web_self_query_vars": "\/index.php",
+          "web_cid_query": "",
+          "web_rel_code": "\/main\/"
+      }</script>
+                      <script>
+                      function courseLogout() {
+                      }
+                      </script>
+      
+      <script src="https://academie.cyclable.com/web/build/main.french.js"></script>
+      
+      <link href="https://academie.cyclable.com/web/css/base.css" rel="stylesheet" media="screen" type="text/css">
+      <link href="https://academie.cyclable.com/web/css/themes/academicacyclablevide/default.css" rel="stylesheet" media="screen" type="text/css">
+      <link href="https://academie.cyclable.com/web/css/editor_content.css" rel="stylesheet" media="screen" type="text/css">
+      
+      
+      </head>
+      <body class="page_origin_">
+          <!-- START MAIN -->
+          <main id="main" dir="ltr" class="section-mycampus section-login">
+          <noscript>Votre navigateur n'autorise pas le JavaScript. Chamilo dépend hautement du JavaScript pour vous fournir une interface plus dynamique. Il est probable que la plupart des fonctionnalités soient accessibles, mais vous pourriez passer à côté des dernières améliorations en termes d'usabilité. Nous vous suggérons de modifier la configuration de votre navigateur (généralement dans le menu Édition -> Préférences) et de rafraîchir cette page.</noscript>
+      
+                  
+                                  <!-- START HEADER -->
+                      <header id="cm-header">
+                          <div id="navigation" class="notification-panel">
+          
+          
+      </div>
+          <!-- Topbar -->
+      
+          
+      <div class="container">
+          <div class="row">
+              <div class="col-xs-12 col-md-3">
+                                  <div class="key-login">
+                          <a href="#login-block" id="btn-login" class="btn btn-default">
+                              <img src="https://academie.cyclable.com/main/img/icons/22/key.png" alt="key"> S'authentifier
+                          </a>
+                      </div>
+                              <div class="logo">
+                      <a href="https://academie.cyclable.com/index.php"><img title="Cyclable Académie" class="img" id="header-logo" src="quantum.png" alt="header-logo-custom1.png"></a>
+                  </div>
+              </div>
+              <div class="col-xs-12 col-md-9">
+                  <div class="row">
+                      <div class="col-sm-4">
+                                          </div>
+                      <div class="col-sm-3">
+                                          </div>
+                      <div class="col-sm-5">
+                          <ol class="header-ol">
+                                                      <li>
+                                  <div class="section-notifications">
+                                                                  </div>
+                              </li>
+                              <li>
+                                  
+                              </li>
+                          </ol>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      </div>
+      
+      <!-- Fixed navbar -->
+      <nav class="navbar navbar-default">
+          <div class="container">
+              <div class="navbar-header">
+                  <button type="button" class="pull-right  navbar-toggle collapsed" data-toggle="collapse" data-target="#navbar" aria-expanded="false" aria-controls="navbar">
+                      <span class="sr-only">Toggle navigation</span>
+                      <span class="icon-bar"></span>
+                      <span class="icon-bar"></span>
+                      <span class="icon-bar"></span>
+                  </button>
+      
+                              <a class="navbar-brand" href="https://academie.cyclable.com/"> <em class="fa fa-home"></em> </a>
+              </div>
+      
+              <div id="navbar" class="collapse navbar-collapse">
+                  <ul class="nav navbar-nav">
+                                                              
+                                                  <li class="homepage active">
+                                  <a href="https://academie.cyclable.com/index.php" title="Page d'accueil">
+                                      Page d'accueil
+                                  </a>
+                              </li>
+                                                      </ul>
+                          </div><!--/.nav-collapse -->
+          </div>
+      </nav>
+                  <div class="nav-tools">
+                  
+              </div>
+                          </header>
+      
+                  
+                  <!-- START CONTENT -->
+                  <section id="cm-content">
+                      <div class="container">
+                                                  <!-- TOOLS SHOW COURSE -->
+                              <div id="cm-tools" class="nav-tools">
+                                  
+                              </div>
+                              <!-- END TOOLS SHOW COURSE -->
+                          
+                                                  
+                          
+                                  <div class="row">
+              <div class="col-md-9 col-md-push-3">
+                  <div class="page-content">
+                      
+                      
+      
+                                          
+      
+      
+      
+                      
+                                          <article id="home-welcome">
+                              <p><span style="font-size:28px;"><strong><span style="font-family:Arial,Helvetica,sans-serif;"><img alt="" height="135" src="https://chamilo.cyclable.com/app/upload/users/3/3/my_files/backgroundpetit.png" width="920"></span></strong></span></p>
+      
+      <p><span style="font-size:20px;"><strong><span style="font-family:Arial,Helvetica,sans-serif;">En&nbsp;route&nbsp;pour&nbsp;les parcours de&nbsp;formation</span></strong></span></p>
+      
+      <p>&nbsp;</p>
+      
+      
+      <p><font face="Arial, Helvetica, sans-serif"><span style="font-size: 16px;"><b>Le navigateur Google Chrome est recommandé&nbsp;<img alt="" height="29" src="https://chamilo.cyclable.com/app/upload/users/3/3/my_files/Chrome-Couleur.png" width="51"></b></span></font></p>
+      
+      <div>
+      <div>
+      <div>
+      <div>
+      
+      <p>&nbsp;</p>
+      </div>
+      
+      <p>&nbsp;</p>
+      </div>
+      
+      <p>&nbsp;</p>
+      </div>
+      
+      <p>&nbsp;</p>
+      </div>
+      
+      <p>&nbsp;</p>
+      
+      <p>&nbsp;</p>
+      
+      <p>&nbsp;</p>
+      
+      <p>&nbsp;</p>
+      
+      <p>&nbsp;</p>
+      
+      <p>&nbsp;</p>
+      
+      <p><span style="font-size:24px;"><strong><span style="font-family:Arial,Helvetica,sans-serif;">&nbsp;</span></strong></span></p>
+      
+      <p>&nbsp;</p>
+      
+      <p>&nbsp;</p>
+      
+      <p>&nbsp;</p>
+      
+      <p>&nbsp;</p>
+                          </article>
+                      
+                      
+      
+                      
+                                                          
+                      
+                                                                                  </div>
+              </div>
+              <div class="col-md-3 col-md-pull-9">
+                  <div class="sidebar">
+                      
+                                  <div id="login-block" class="panel panel-default">
+                  <div class="panel-body">
+                  <div class="btn-group">
+                    <button type="button" class="btn btn-default dropdown-toggle" data-toggle="dropdown">
+                      <span class="flag-icon flag-icon-fr"></span>
+                      Français
+                      <span class="caret">
+                      </span>
+                    </button><ul class="dropdown-menu" role="menu"><li><a href="/index.php?language=bulgarian"><span class="flag-icon flag-icon-bg"></span> Български</a></li><li><a href="/index.php?language=greek"><span class="flag-icon flag-icon-ae"></span> Ελληνικά</a></li><li><a href="/index.php?language=indonesian"><span class="flag-icon flag-icon-id"></span> Bahasa Indonesia</a></li><li><a href="/index.php?language=bosnian"><span class="flag-icon flag-icon-ba"></span> Bosanski</a></li><li><a href="/index.php?language=german"><span class="flag-icon flag-icon-de"></span> Deutsch</a></li><li><a href="/index.php?language=english"><span class="flag-icon flag-icon-gb"></span> English</a></li><li><a href="/index.php?language=spanish"><span class="flag-icon flag-icon-es"></span> Español</a></li><li><a href="/index.php?language=basque"><span class="flag-icon flag-icon-es"></span> Euskara</a></li><li><a href="/index.php?language=french"><span class="flag-icon flag-icon-fr"></span> Français</a></li><li><a href="/index.php?language=galician"><span class="flag-icon flag-icon-es"></span> Galego</a></li><li><a href="/index.php?language=italian"><span class="flag-icon flag-icon-it"></span> Italiano</a></li><li><a href="/index.php?language=latvian"><span class="flag-icon flag-icon-lv"></span> Latviešu</a></li><li><a href="/index.php?language=hungarian"><span class="flag-icon flag-icon-hu"></span> Magyar</a></li><li><a href="/index.php?language=dutch"><span class="flag-icon flag-icon-nl"></span> Nederlands</a></li><li><a href="/index.php?language=polish"><span class="flag-icon flag-icon-pl"></span> Polski</a></li><li><a href="/index.php?language=brazilian"><span class="flag-icon flag-icon-br"></span> Português do Brasil</a></li><li><a href="/index.php?language=portuguese"><span class="flag-icon flag-icon-pt"></span> Português europeu</a></li><li><a href="/index.php?language=slovak"><span class="flag-icon flag-icon-sk"></span> Slovenčina</a></li><li><a href="/index.php?language=slovenian"><span class="flag-icon flag-icon-si"></span> Slovenščina</a></li><li><a href="/index.php?language=tagalog"><span class="flag-icon flag-icon-tl"></span> Tagalog</a></li></ul></div>
+                  
+                  
+                  <form class="form-horizontal" action="/index.php" method="post" name="formLogin" id="formLogin">
+              <fieldset>
+                  <label for="login">Nom d'utilisateur</label>
+                              <div class="input-group">
+                                  <div class="input-group-addon">
+                      <em class="fa fa-user fa-fw"></em>
+                      </div>
+                                  <input id="login" autofocus="autofocus" placeholder="Nom d'utilisateur" class=" form-control" name="login" type="text">
+                              </div><label for="password">Mot de passe</label>
+                              <div class="input-group">
+                                  <div class="input-group-addon">
+                      <em class="fa fa-lock fa-fw"></em>
+                      </div>
+                                  <input id="password" placeholder="Mot de passe" class="form-control form-control" name="password" type="password">
+                              </div> 
+                      <button class="btn-block btn btn-primary " name="submitAuth" type="submit" id="formLogin_submitAuth">S'identifier</button> 	<div class="form-group">
+              <div class="col-sm-offset-2 col-sm-10"><span class="form_required">*</span> <small>Information requise</small></div>
+          </div>
+              </fieldset>
+              <input name="_qf__formLogin" type="hidden" value="" id="formLogin__qf__formLogin">
+      
+              </form><div></div>
+      
+                                  <ul class="nav nav-pills nav-stacked">
+                          
+                                                                          
+                              
+                              <li><a href="https://academie.cyclable.com/main/auth/lostPassword.php"> Mot de passe perdu </a></li>
+                                          </ul>
+                  
+                              </div>
+              </div>
+          
+                      
+                          
+                          <!-- BLOCK PROFILE -->
+                          
+                          <!-- BLOCK COURSE -->
+                          
+                          <!-- BLOCK SKILLS -->
+                          
+                          <!-- BLOCK WORK -->
+                          
+                                              
+                          <!-- BLOCK NOTICE -->
+                                                      <div class="panel-group" id="notice" role="tablist" aria-multiselectable="true">
+              <div class="panel panel-default" id="notice_block">
+                  <div class="panel-heading" role="tab">
+      
+                      
+                      <a role="button" data-toggle="collapse" data-parent="#notice" href="#noticeCollapse" aria-expanded="true" aria-controls="noticeCollapse">
+                          Remarque
+                      </a>
+      
+                                  </div>
+                  <div aria-expanded="true" id="noticeCollapse" class="panel-collapse collapse in" role="tabpanel">
+                      <div class="panel-body">
+                                                  <h5>Pour toute question :</h5><p>
+      Vous pouvez contacter Corrine Morel au (514)-274-7096 ou par mail : corinne@quantumebikes.com
+                                          </p></div>
+                  </div>
+              </div>
+          </div>
+      
+                                              <!-- BLOCK HELP -->
+                                              <!-- BLOCK LINKS NAVIGATION -->
+                                              
+                          
+      
+                                                      </div>
+              </div>
+          </div>
+                          </div>
+                  </section>
+                  <!-- END CONTENT -->
+      
+                              <!-- START FOOTER -->
+                  <footer class="footer">
+                      <div class="container">
+              <section class="sub-footer">
+              <div class="row">
+                  <div class="col-xs-12 col-md-4">
+                                                                  </div>
+                  <div class="col-xs-12 col-md-4">
+                                  </div>
+                  <div class="col-xs-12 col-md-4 text-right">
+                                                          <div class="software-name">
+                                                            <a href="https://quantumebikes.com/" target="_blank">
+                                <img title="quantum" class="img" id="header-logo" src="quantum.png" alt="header-logo-custom1.png"width="200" height="70"></a>
+                  </div>
+                              </a>© 2023
+                          </div>
+                                                  </div>
+              </div>
+                  </section>
+      </div>
+      
+                  </footer>
+                  <!-- END FOOTER -->
+                  
+              </main>
+          <!-- END MAIN -->
+      
+          <div class="modal fade" id="global-modal" tabindex="-1" role="dialog" aria-labelledby="global-modal-title" aria-hidden="true">
+          <div class="modal-dialog modal-lg">
+              <div class="modal-content">
+                  <div class="modal-header">
+                      <button type="button" class="close" data-dismiss="modal" aria-label="Fermer">
+                          <span aria-hidden="true">×</span>
+                      </button>
+                      <h4 class="modal-title" id="global-modal-title">&nbsp;</h4>
+                  </div>
+                  <div class="modal-body" id="global-modal-body">
+                  </div>
+              </div>
+          </div>
+      </div>
+      
+      <div class="modal fade" id="expand-image-modal" tabindex="-1" role="dialog" aria-labelledby="expand-image-modal-title" aria-hidden="true">
+          <div class="modal-dialog modal-lg">
+              <div class="modal-content">
+                  <div class="modal-header">
+                      <button type="button" class="close" data-dismiss="modal" aria-label="Fermer"><span aria-hidden="true">×</span></button>
+                      <h4 class="modal-title" id="expand-image-modal-title">&nbsp;</h4>
+                  </div>
+                  <div class="modal-body">
+                  </div>
+              </div>
+          </div>
+      </div>
+      
+      <div class="modal fade" id="confirm-delete" tabindex="-1" role="dialog" aria-labelledby="confirm-delete-title" aria-hidden="true">
+          <div class="modal-dialog">
+              <div class="modal-content">
+                  <div class="modal-header">
+                      <button type="button" class="close" data-dismiss="modal" aria-hidden="true">×</button>
+                      <h4 class="modal-title" id="confirm-delete-title">Supprimer</h4>
+                  </div>
+      
+                  <div class="modal-body">
+                      <p class="debug-url"></p>
+                  </div>
+      
+                  <div class="modal-footer">
+                      <button type="button" class="btn btn-default" data-dismiss="modal">Annuler</button>
+                      <a id="delete_item" class="btn btn-danger btn-ok">Supprimer</a>
+                  </div>
+              </div>
+          </div>
+      </div>
+      
+      </body></html>
